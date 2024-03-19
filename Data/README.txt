@@ -1,13 +1,11 @@
-This folder contains the file used to:
-	1. record data from the detector to the computer
-	2. save data from the sd card
-	3. remove the data from the sd card
 
-This code was written using python 2.7
+import_data.py
+This python script will allow you to record data from your detector to the computer.
+The benefit is that each event is additionally given a time stamp from your computer.
 
-Running it requires two libraries:
+Running it requires one library:
 	1. pyserial (used to read data through the serial port)	
-	2. tornado (used to connect to the CosmicWatch website)
 
-After installing libraries, simply plug the detector into a USB port, run the import.py
-python script, and you will be prompted on what you want to do.
+After installing library, simply plug the detector into a USB port, run import_data.py
+>> python import_data.py
+python script, and you will be prompted you to select the serial port you want to record data from.
