@@ -16,6 +16,7 @@ import numpy as np
 import math
 import random
 import platform
+import pathlib 
 
 print('Operating System: ',platform.system())
 
@@ -75,18 +76,27 @@ if ArduinoPort == 'h':
     sys.exit()
 
 
+print('')
 
 # Ask for file name:
 cwd = os.getcwd()
-print('')
+default_fname = cwd+"/Data/CW_data.txt"
 if sys.version_info[:3] > (3,0):
-    fname = input("Enter file name (default: "+cwd+"/CW_data.txt):")
+    fname = input("Enter file name (default: "+default_fname+")")
+    if fname == '':
+        path = pathlib.Path(default_fname)
+        fname = default_fname
+    pathlib.Path(path.parent).mkdir(parents=True, exist_ok=True)
 elif sys.version_info[:3] > (2,5,2):
-    fname = raw_input("Enter file name (default: "+cwd+"/CW_data.txt):")
+    fname = raw_input("Enter file name (default: "+default_fname+")")
+    if fname == '':
+        fname = default_fname
+        if not os.path.exists(default_fname):
+            os.makedirs(default_fname)
 detector_name_list = []
-if fname == '':
-    fname = cwd+"/CW_data.txt"
-print(' -- Saving data to: '+fname)
+
+#if fname == '':
+print('  Saving data to: '+fname)
 
 # Make a dictionary for each connected detector
 
@@ -123,29 +133,21 @@ else:
 while True:
     for i in range(nDetectors):
         if globals()['Det%s' % str(i)].inWaiting():
-            
             data = globals()['Det%s' % str(i)].readline().decode().replace('\r\n','')    # Wait and read data 
-            #print(data)
             data = data.split("\t")
-            
             ti = str(datetime.now()).split(" ")
             comp_time = ti[-1]
             data.append(comp_time)
-            #data[1] = comp_time
             comp_date = ti[0].split('-')
-            data.append(comp_date[2] + '/' +comp_date[1] + '/' + comp_date[0]) #ti[0].replace('-','/')
+            data.append(comp_date[2] + '/' +comp_date[1] + '/' + comp_date[0]) 
             for j in range(len(data)):
-                #print(data[j])
                 file.write(data[j]+'\t')
             file.write("\n")
-            #print(str(i+'\t') for i in data)
             print(*data, sep='\t')
             event_number = int(data[0])
-            if event_number % 1 ==0:
+            if event_number % 10 == 0: # Flush data to computer every 10 events
                 file.flush() 
 
-
-#for i in range(nDetectors):
 globals()['Det%s' % str(0)].close()     
 file.close()  
 
