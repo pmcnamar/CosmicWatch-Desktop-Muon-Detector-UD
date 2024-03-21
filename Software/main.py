@@ -16,7 +16,6 @@ import sdcard
 
 from ssd1306 import SSD1306_I2C
 
-
 from machine import Pin, I2C, ADC, Timer, PWM
 from bmp280 import *
 from functions import *
@@ -29,16 +28,16 @@ event_rate_std = 0
 class detectorClass():
     def __init__(self):
         self.trigger_mode     = 'running' # interupt or running
-        self.SignalThreshold  = 3000
+        self.SignalThreshold  = 200 #[0 - 4095 on HGain]
         self.OLED             = True   # Turn on/off OLED.
         self.Buzzer           = False   # Turn on/off OLED.
-        self.VERBOSE          = False   #print out detector information through the serial port.
+        self.VERBOSE          = True   #print out detector information through the serial port.
         
         self.OLED_SDA         = 14
         self.OLED_SCL         = 15
         self.COINCIDENCE      = False  #Is there another detector plugged into the RJ45 connector?
-        self.SignalPin1       = 28
-        self.SignalPin2       = 26
+        self.SignalPin1       = 26
+        self.SignalPin2       = 28
         self.LEDPin1     	  = 9
         self.PicoLED     	  = 25
         self.LEDPin2          = 8
@@ -59,7 +58,6 @@ class detectorClass():
 
 class eventClass():
     def __init__(self):
-        self.Event_coincident    = False
         self.EventNumber         = 0
         self.CoincidentEventNumber = 0
         self.ADC_value           = 0
@@ -68,14 +66,16 @@ class eventClass():
         self.Pressure            = 0
         self.Temperature         = 0
         self.Deadtime            = 0
-        self.Coincident			= False
+        self.Coincident			 = 0
 
 d = detectorClass()
 e = eventClass()
 
+setup_BMP280Sensor(d,e)
+
 scan_I2CDevices(d)
 setup_detector_name(d)
-setup_BMP280Sensor(d)
+setup_signal_treshold(d)
 setup_OLED(d)
 setup_GPIO(d)
 OLEDSlashScreen(d)
@@ -94,7 +94,8 @@ timer = Timer(period=500, mode=Timer.PERIODIC, callback = lambda t:UpdateOLED(d,
 def event_Trigger(pin):
     trigger_Detector(d,e)
     
-d.start_time = millis()  
+d.start_time = millis()
+
 if d.trigger_mode == 'interupt':
     d.Trigger.irq(trigger=d.Trigger.IRQ_RISING, handler=event_Trigger)
     while True:
@@ -102,8 +103,8 @@ if d.trigger_mode == 'interupt':
 
 elif (d.trigger_mode == 'running'):
     while True:
-        e.ADC_value_1   = d.ADC1.read_u16()
-        if (e.ADC_value_1 > d.SignalThreshold):
+        e.ADC_value_2 = d.ADC2.read_u16()
+        if (e.ADC_value_2  > d.TriggerThreshold):
             trigger_Detector(d,e)
             
          

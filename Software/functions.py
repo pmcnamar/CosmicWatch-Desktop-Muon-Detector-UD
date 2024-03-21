@@ -34,32 +34,27 @@ def get_SiPM_peak_voltage(HGain_adc_value, LGain_adc_value):
               
 def write_to_microsd(d, e):
     if (d.is_SDAvailable == True):
-        d.sd_file.write(str(e.EventNumber)+'\t'+str(e.Timestamp)+'\t'+str(e.ADC_value_1)+'\t'+str(e.ADC_value_2)+'\t'+'\t'+str(e.SiPM_pulse_amplitdue)+'\t'+str(e.Pressure)+'\t'+str(e.Temperature)+'\t'+str(e.Deadtime)+'\t'+str(e.Coincident)+'\t'+d.DetectorName)
+        d.sd_file.write(str(e.EventNumber)+'\t'+str(e.Timestamp)+'\t'+str(e.ADC_value_1)+'\t'+str(e.ADC_value_2)+'\t'+str(e.SiPM_pulse_amplitdue)+'\t'+str(e.Pressure)+'\t'+str(e.Temperature)+'\t'+str(e.Deadtime)+'\t'+str(e.Coincident)+'\t'+d.DetectorName+'\n')
         if (e.EventNumber % 20) == 0:
             d.sd_file.flush()
 
 def write_to_serial(d,e):
     print(str(e.EventNumber)+'\t'+str(e.Timestamp)+'\t'+str(e.ADC_value_1)+'\t'+str(e.ADC_value_2)+'\t'+str(e.SiPM_pulse_amplitdue)+'\t'+str(e.Pressure)+'\t'+str(e.Temperature)+'\t'+str(e.Deadtime)+'\t'+str(e.Coincident)+'\t'+d.DetectorName)
-  
-def ReadoutData(d,e):
-    
-    t1 = millis()
-    write_to_microsd(d,e)
-    write_to_serial(d,e)
-    e.Deadtime = 0
-    #print((time_diff(millis(),t1)))
-    e.Deadtime    += (time_diff(millis(),t1))#millis()-t1
-    
-    d.TotalDeadtime += e.Deadtime
+
      
 def UpdateOLED(d,e):
+    td1 = micros()
     t1 = millis()
-    if t1 == d.start_time:
+    d.bmp.force_measure()
+    e.Pressure     = round(d.bmp.pressure,1)
+    e.Temperature  = round(d.bmp.temperature,1)
+        
+    if (t1 - d.start_time) < 0.1:
         return
+
     if d.OLED:
         runtime = time_diff(t1, d.start_time)/1000.
         livetime  = runtime - (d.TotalDeadtime/1000.)
-        
         coincidence_event_rate       = e.CoincidentEventNumber /livetime 
         coincidence_event_rate_std   = math.sqrt(e.CoincidentEventNumber) / livetime
         event_rate                   = e.EventNumber / livetime
@@ -68,6 +63,7 @@ def UpdateOLED(d,e):
         hours                   = int(livetime / 3600.)
         minutes                 = int(livetime / 60.) % 60
         seconds                 = int(livetime) % 60
+        
         
         livetime_readout = f'{hours:02d}'+":"+f'{minutes:02d}' +":"+f'{seconds:02d}' 
         d.display.fill(0)    
@@ -78,35 +74,30 @@ def UpdateOLED(d,e):
             d.display.text(d.DetectorName.upper(),int((128-(len(d.DetectorName) * 8))/2),5)
             d.display.text(livetime_readout,int((128- (len(livetime_readout) * 8))/2),15)
             
-            count_readout= "TOTAl: "
+            count_readout= "TOTAL: "
             n_spaces = int(128-len(count_readout)*8-len(str(e.EventNumber))*8)/8
             for i in range(n_spaces):
                 count_readout=count_readout+" "
             count_readout +=  str(e.EventNumber)
 
             d.display.text(count_readout,0,25)
-            rate_readout = "%.2f" % event_rate +"+/-" + "%.2f" % event_rate_std +"Hz"
-            if len(rate_readout)*8 < 112:
-                rate_readout = "%.3f" % event_rate +"+/-" + "%.3f" % event_rate_std +"Hz"
-
-            if len(rate_readout)*8 > 128:
-                rate_readout = "%.2f" % event_rate +"+/-" + "%.2f" % event_rate_std
+            
+            rate_readout = "%.3f" % event_rate +"+/-" + "%.3f" % event_rate_std +" Hz"
+            if event_rate>= 10.:
+                rate_readout = "%.2f" % event_rate +"+/-" + "%.2f" % event_rate_std +" Hz"
+                
             d.display.text(rate_readout,int((128- (len(rate_readout) * 8))/2),35)
             
             count_readout= "COINC: "
             n_spaces = int(128-len(count_readout)*8-len(str(e.CoincidentEventNumber))*8)/8
             for i in range(n_spaces):
-                count_readout=count_readout+" "
+                count_readout = count_readout+" "
             count_readout +=  str(e.CoincidentEventNumber)
             d.display.text(count_readout,0,45)
             
-            rate_readout = "%.2f" % event_rate +"+/-" + "%.2f" % event_rate_std +"Hz"
-            if len(rate_readout)*8 < 112:
-                rate_readout = "%.3f" % coincidence_event_rate +"+/-" + "%.3f" % coincidence_event_rate_std +"Hz"
-
-            if len(rate_readout)*8 > 128:
-                rate_readout = "%.2f" % coincidence_event_rate +"+/-" + "%.2f" % coincidence_event_rate_std
-            d.display.text(rate_readout,int((128- (len(rate_readout) * 8))/2),55)
+            coincidence_rate_readout = "%.3f" % coincidence_event_rate +"+/-" + "%.3f" % coincidence_event_rate_std +" Hz"
+            
+            d.display.text(coincidence_rate_readout,int((128- (len(coincidence_rate_readout) * 8 ))/2),55)
             
             
         else:
@@ -120,71 +111,65 @@ def UpdateOLED(d,e):
             count_readout +=  str(e.EventNumber)
 
             d.display.text(count_readout,0,40)
-            rate_readout = "%.2f" % event_rate +"+/-" + "%.2f" % event_rate_std +"Hz"
-            if len(rate_readout)*8 < 112:
-                rate_readout = "%.3f" % event_rate +"+/-" + "%.3f" % event_rate_std +"Hz"
-
-            if len(rate_readout)*8 > 128:
-                rate_readout = "%.2f" % event_rate +"+/-" + "%.2f" % event_rate_std
+            
+            rate_readout = "%.2f" % event_rate +"+/-" + "%.2f" % event_rate_std +" Hz"
+            
+            if event_rate>= 100.:
+                rate_readout = "%.2f" % event_rate +"+/-" + "%.2f" % event_rate_std 
+                
+            if event_rate_std < 0.02:#if len(rate_readout)*8 < 112:
+                rate_readout = "%.3f" % event_rate +"+/-" + "%.3f" % event_rate_std +" Hz"
+                if event_rate>= 10.:
+                    rate_readout = "%.2f" % event_rate +"+/-" + "%.2f" % event_rate_std +" Hz"
+                    if event_rate>= 100.:
+                        rate_readout = "%.2f" % event_rate +"+/-" + "%.2f" % event_rate_std +""
+                    
             d.display.text(rate_readout,int((128- (len(rate_readout) * 8))/2),50)
         
         d.display.show()
         
-        t2 = time_diff(millis(),t1)
-        e.Deadtime += t2 
-        #d.TotalDeadtime += t2
+        e.Deadtime += time_diff(micros(),td1)
+        
         
 
 def trigger_Detector(d,e):
-    d.CoincidencePinOutput.high() # takes 11us
     e.ADC_value_1    = d.ADC1.read_u16()
-    e.ADC_value_2    = d.ADC2.read_u16()
 
+    d.CoincidencePinOutput.high() # takes 11us
+    
     for i in range(3):
       if d.CoincidencePinInput.value() == 1:
           e.Coincident = 1
-          e.CoincidentEventNumber += 1
-          break
-      else:
-          e.Coincident = 0 # a single check takes 14 microsecond
+        
     d.CoincidencePinOutput.low()
     
-    e.ADC_value_1    = math.ceil((e.ADC_value_1+1)/16)-1
-    e.ADC_value_2    = math.ceil((e.ADC_value_2+1)/16)-1
-    
-    t1 = millis()
-    e.SiPM_pulse_amplitdue = get_SiPM_peak_voltage(e.ADC_value_1,e.ADC_value_2)
-    #print(SiPM_pulse_amplitdue)
-    e.Timestamp    = time_diff(t1,d.start_time)
-    e.EventNumber     +=1
-    e.Pressure     = d.bmp.pressure
-    e.Temperature  = d.bmp.temperature
-    
-    #e.SiPM_peak_voltage_1   = get_SiPM_peak_voltage(e.ADC_value_1)
-    #e.SiPM_peak_voltage_2   = get_SiPM_peak_voltage(e.ADC_value_2)
-
+    if e.Coincident == 1:
+        e.CoincidentEventNumber += 1
     
     turn_on_LEDs(d,e)
+        
+    td1 = micros()
     
-    #print(time_diff(millis(),t1))
-    t2 = millis()
-    e.Deadtime    += (time_diff(t2,t1))#millis()-t1
-    #print((time_diff(t2,t1)))
-    #millis()-t1
-    ReadoutData(d,e)
-    
-    
-    d.ResetTrigger.high()
-    turn_off_LEDs(d,e)
-    d.ResetTrigger.low()
-    
-    #e.Deadtime += (time_diff(millis(),t2))
-    
-    
-    
-    
-    
+    e.Timestamp    = time_diff(millis(),d.start_time)
+    e.ADC_value_1    = math.ceil((e.ADC_value_1+1)/16)-1
+    e.ADC_value_2    = math.ceil((e.ADC_value_2+1)/16)-1
+    e.SiPM_pulse_amplitdue = get_SiPM_peak_voltage(e.ADC_value_1,e.ADC_value_2)
+    e.EventNumber     +=1
 
+    td2 = micros()
+    e.Deadtime    += (time_diff(td2,td1)) + 20 
+    d.TotalDeadtime += e.Deadtime/1000.
+    write_to_microsd(d,e)
+    write_to_serial(d,e)
+    e.Deadtime = 0
+    #d.ResetTrigger.high()
+    #if e.Coincident == 1:
+    turn_off_LEDs(d,e)
+    #d.ResetTrigger.low()
+    e.Coincident = 0
+    
+    e.Deadtime    += (time_diff(micros(),td2))
+    
 
 def sleep(s):
     return time.sleep(s)
@@ -196,9 +181,6 @@ def micros():
     return time.ticks_us()
 def millis():
     return time.ticks_ms()
-def nanos():
-    return time.time_ns()
-
 
 def time_diff(ticks1,ticks2):
     return time.ticks_diff(ticks1, ticks2) # This function accounts for wrap around.
@@ -208,6 +190,7 @@ def setup_detector_name(d):
     d.DetectorName = file.readline()
     if len(d.DetectorName)>16:
         print('Detector Name is too long, set it to shorter than 16 characters')
+        d.DetectorName = "DetNameIsToLong"
     file.close()
     
 def scan_I2CDevices(d):
@@ -222,7 +205,8 @@ def scan_I2CDevices(d):
                 if device == 118:
                     print("# OLED 0.96: Decimal address: ",device," | Hexa address: ",hex(device))
         else:
-            print("Unknown: Decimal address: ",device," | Hexa address: ",hex(device))
+            if d.VERBOSE:
+                print("# Unknown: Decimal address: ",device," | Hexa address: ",hex(device))
 
 def check_CoincidentDetector(d,e):
 
@@ -230,40 +214,39 @@ def check_CoincidentDetector(d,e):
     if d.CoincidencePinInput.value() == 1:
         d.CoincidencePinOutput = Pin(d.CoincidencePin2, mode = Pin.OUT)
         d.CoincidencePinOutput.high()
-        
         d.LED_5mm.duty_u16(int(100 * 65535/100.))
         d.LED_3mm.duty_u16(int(100 * 65535/100.))
-        
         time.sleep(1)
         d.LED_5mm.duty_u16(0)
         d.LED_3mm.duty_u16(0)
-
         d.CoincidencePinOutput.low()
-
         d.COINCIDENCE      = True     
-      
         if d.VERBOSE:
             print("# Coincidence detector found.")
     else:
         d.CoincidencePinOutput = Pin(d.CoincidencePin1, mode = Pin.OUT)
         d.CoincidencePinOutput.high()
         d.CoincidencePinInput = Pin(d.CoincidencePin2, mode = Pin.IN)
+        counter = 0
         for i in range(100):
             time.sleep(0.01)
             if d.CoincidencePinInput.value() == 1:
-                d.LED_5mm.duty_u16(int(100 * 65535/100.))
-                d.LED_3mm.duty_u16(int(100 * 65535/100.))
-                
-                time.sleep(1)
-                d.LED_5mm.duty_u16(0)
-                d.LED_3mm.duty_u16(0)
-                d.COINCIDENCE      = True
-                if d.VERBOSE:
-                    print("# Coincidence detector found.")
-                break
+                counter+=1
+                if counter > 5:
+                    d.LED_5mm.duty_u16(int(100 * 65535/100.))
+                    d.LED_3mm.duty_u16(int(100 * 65535/100.))
+                    
+                    time.sleep(1)
+                    d.LED_5mm.duty_u16(0)
+                    d.LED_3mm.duty_u16(0)
+                    d.CoincidencePinOutput.low()
+                    d.COINCIDENCE      = True
+                    if d.VERBOSE:
+                        print("# Coincidence detector found.")
+                    #break
+            
     
-    
-def setup_BMP280Sensor(d):
+def setup_BMP280Sensor(d,e):
     i2c = I2C(1,sda=Pin(14), scl=Pin(15), freq=400000)
     d.bmp = BMP280(i2c, 0x76)
     d.bmp.use_case(BMP280_CASE_WEATHER)
@@ -274,9 +257,13 @@ def setup_BMP280Sensor(d):
     d.bmp.iir = BMP280_IIR_FILTER_2
     d.bmp.spi3w = BMP280_SPI3W_ON
     d.bmp.sleep()
+    e.Temperature = d.bmp.temperature
+    e.Pressure    = d.bmp.pressure
     if d.VERBOSE:
-        print("# Temperature " +str(d.bmp.temperature) +"C")
-        print("# Pressure " + str(d.bmp.pressure)+"Pa")
+        print("# Temperature " +str(e.Temperature) +"C")
+        print("# Pressure " + str(e.Pressure)+"Pa")
+        
+        
     d.bmp.power_mode = BMP280_POWER_NORMAL
     
     '''
@@ -414,6 +401,7 @@ def setup_buzzer(d):
 def setup_ADC(d):
     d.ADC1 = ADC(d.SignalPin1) #low gain
     d.ADC2 = ADC(d.SignalPin2) #high gain
+    
 
 def setup_GPIO(d):
     d.LED_3mm = PWM(Pin(d.LEDPin1))
@@ -421,8 +409,17 @@ def setup_GPIO(d):
     d.LED_5mm = PWM(Pin(d.LEDPin2))
     d.LED_5mm.freq(1000)
     d.Trigger = Pin(d.Trigger, Pin.IN)
-    d.ResetTrigger = Pin(d.ResetPin, Pin.OUT, value = 0)
+    Pin(2, Pin.IN)
+    Pin(3, Pin.IN)
+    Pin(4, Pin.IN)
+    Pin(5, Pin.IN)
     
+    d.ResetTrigger = Pin(d.ResetPin, Pin.OUT, value = 0)
+    Pin(Pin(23), Pin.IN)
+    #PWM(Pin(23))
+    
+def setup_signal_treshold(d):
+    d.TriggerThreshold = int(d.SignalThreshold *16)
  
 def setup_OLED(d):
     if d.OLED:
@@ -521,7 +518,7 @@ def write_microSD_header(d):
         d.sd_file.write("### Device ID: " + str(d.DetectorName) +"\r")
         #d.sd_file.write("### Launch time: " + str(d.DetectorName) +"\r")
         d.sd_file.write("### Questions? Email Spencer N. Axani (saxani@udel.edu)\r")
-        d.sd_file.write("### Event TimeStamp[ms] ADC1 ADC2 SiPM[mV] Temp[C] Pressure[Pa] DeadTime[ms] Coincident Name\r")
+        d.sd_file.write("### Event TimeStamp[ms] ADC1 ADC2 SiPM[mV] Temp[C] Pressure[Pa] DeadTime[us] Coincident Name\r")
         d.sd_file.write("###################################################################################################\r")
 
 def print_serial_header(d):
@@ -530,7 +527,7 @@ def print_serial_header(d):
     print("### Device ID: " + str(d.DetectorName) +"\r")
     #print("### Launch time: " + str(d.DetectorName) +"\r")
     print("### Questions? Email Spencer N. Axani (saxani@udel.edu)\r")
-    print("### Event TimeStamp[ms] ADC1 ADC2 SiPM[mV] Temp[C] Pressure[Pa] DeadTime[ms] Coincident Name\r")
+    print("### Event TimeStamp[ms] ADC1 ADC2 SiPM[mV] Temp[C] Pressure[Pa] DeadTime[us] Coincident Name\r")
     print("###################################################################################################\r")
 
 def turn_on_LEDs(d,e):
