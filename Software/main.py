@@ -55,6 +55,7 @@ class detectorClass():
         self.SD_SCK 		  = 10
         self.SD_Detect 		  = 22
         self.Trigger		  = 19
+        self.roll_over_times = []
 
 class eventClass():
     def __init__(self):

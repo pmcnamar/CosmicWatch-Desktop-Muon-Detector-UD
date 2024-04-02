@@ -49,11 +49,11 @@ def UpdateOLED(d,e):
     e.Pressure     = round(d.bmp.pressure,1)
     e.Temperature  = round(d.bmp.temperature,1)
         
-    if (t1 - d.start_time) < 0.1:
+    if time_diff(t1, d.start_time) < 0.1:
         return
 
     if d.OLED:
-        runtime = time_diff(t1, d.start_time)/1000.
+        runtime = time_diff(t1, d.start_time)/1000. +sum(d.roll_over_times)/1000.
         livetime  = runtime - (d.TotalDeadtime/1000.)
         coincidence_event_rate       = e.CoincidentEventNumber /livetime 
         coincidence_event_rate_std   = math.sqrt(e.CoincidentEventNumber) / livetime
@@ -150,7 +150,16 @@ def trigger_Detector(d,e):
         
     td1 = micros()
     
-    e.Timestamp    = time_diff(millis(),d.start_time)
+    time_since_roll_over    = time_diff(millis(),d.start_time)
+    
+    e.Timestamp = time_since_roll_over
+    for i in range(len(d.roll_over_times)):
+        e.Timestamp += d.roll_over_times[i]
+        
+    if time_since_roll_over > 500000000:
+        d.start_time = millis()
+        d.roll_over_times.append(time_since_roll_over)
+    
     e.ADC_value_1    = math.ceil((e.ADC_value_1+1)/16)-1
     e.ADC_value_2    = math.ceil((e.ADC_value_2+1)/16)-1
     e.SiPM_pulse_amplitdue = get_SiPM_peak_voltage(e.ADC_value_1,e.ADC_value_2)
@@ -257,31 +266,16 @@ def setup_BMP280Sensor(d,e):
     d.bmp.iir = BMP280_IIR_FILTER_2
     d.bmp.spi3w = BMP280_SPI3W_ON
     d.bmp.sleep()
+   
     e.Temperature = d.bmp.temperature
     e.Pressure    = d.bmp.pressure
     if d.VERBOSE:
         print("# Temperature " +str(e.Temperature) +"C")
         print("# Pressure " + str(e.Pressure)+"Pa")
         
-        
     d.bmp.power_mode = BMP280_POWER_NORMAL
-    
-    '''
-    start_time = time.ticks_ms()  # time when measurement starts
-    bmp.force_measure()
-    end_time = time.ticks_ms()  # time when it ends
-    measurement_time = time.ticks_diff(end_time, start_time)  # time taken for the measurement
-    print("Time taken for bmp.force_measure():", measurement_time, "ms")
-    print("Measuring:", bmp.is_measuring)
-    print("Updating:", bmp.is_updating)
-    '''
 
 
-
-    
-    
-
-    
 def setup_buzzer(d):
     if d.Buzzer:
         buzzer = PWM(d.BuzzerPin)
@@ -415,7 +409,7 @@ def setup_GPIO(d):
     Pin(5, Pin.IN)
     
     d.ResetTrigger = Pin(d.ResetPin, Pin.OUT, value = 0)
-    Pin(Pin(23), Pin.IN)
+    #Pin(Pin(23), Pin.IN)
     #PWM(Pin(23))
     
 def setup_signal_treshold(d):
